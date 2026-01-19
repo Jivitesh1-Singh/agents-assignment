@@ -6,7 +6,16 @@ This script simulates the interruption filter logic to verify it works correctly
 across all test cases defined in the challenge.
 
 Run with: python test_interruption_logic.py
+
+Logs are automatically saved to: test_results.log
 """
+
+import logging
+import sys
+from datetime import datetime
+
+# Global logger instance
+logger = None
 
 # Configuration (mirrored from interruption_config.py)
 IGNORE_WORDS = {
@@ -180,6 +189,9 @@ def run_test_suite():
     passed = 0
     failed = 0
     
+    logger.info("Starting test execution...")
+    logger.info("-" * 80)
+    
     for i, test in enumerate(test_cases, 1):
         action, reason = test_filter_logic(test["transcript"], test["agent_speaking"])
         expected = test["expected_action"]
@@ -188,9 +200,17 @@ def run_test_suite():
         if passed_test:
             passed += 1
             status = "✓ PASS"
+            logger.info(f"Test {i} PASSED: {test['name']}")
         else:
             failed += 1
             status = "✗ FAIL"
+            logger.warning(f"Test {i} FAILED: {test['name']}")
+        
+        logger.debug(f"  Description: {test['description']}")
+        logger.debug(f"  Transcript: '{test['transcript']}'")
+        logger.debug(f"  Agent Speaking: {test['agent_speaking']}")
+        logger.debug(f"  Expected: {expected}, Got: {action}")
+        logger.debug(f"  Reason: {reason}")
         
         print(f"Test {i}: {test['name']}")
         print(f"  Description: {test['description']}")
@@ -206,23 +226,85 @@ def run_test_suite():
     print(f"RESULTS: {passed}/{len(test_cases)} passed, {failed}/{len(test_cases)} failed")
     print("=" * 80)
     
+    logger.info("-" * 80)
+    logger.info(f"Test Results Summary:")
+    logger.info(f"  Total: {len(test_cases)}")
+    logger.info(f"  Passed: {passed}")
+    logger.info(f"  Failed: {failed}")
+    logger.info(f"  Success Rate: {(passed/len(test_cases)*100):.1f}%")
+    
     if failed == 0:
         print("✓ All tests passed!")
+        logger.info("[PASS] All tests passed!")
     else:
         print(f"✗ {failed} test(s) failed")
+        logger.error(f"[FAIL] {failed} test(s) failed")
     
     return failed == 0
 
 
 def show_configuration():
     """Display current configuration."""
+    logger.info("Current Configuration:")
+    logger.info(f"  IGNORE_WORDS ({len(IGNORE_WORDS)} words): {sorted(IGNORE_WORDS)}")
+    logger.info(f"  INTERRUPT_WORDS ({len(INTERRUPT_WORDS)} words): {sorted(INTERRUPT_WORDS)}")
+    
     print("\nCURRENT CONFIGURATION:")
     print(f"  IGNORE_WORDS: {sorted(IGNORE_WORDS)}")
     print(f"  INTERRUPT_WORDS: {sorted(INTERRUPT_WORDS)}")
     print()
 
 
+def setup_logging():
+    """Configure logging to both console and file."""
+    global logger
+    
+    # Create logger
+    logger = logging.getLogger("InterruptionHandler")
+    logger.setLevel(logging.DEBUG)
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # File handler (logs to test_results.log)
+    log_filename = f"test_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    file_handler = logging.FileHandler(log_filename)
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler (logs to terminal)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    return log_filename
+
+
 if __name__ == "__main__":
+    log_file = setup_logging()
+    
+    logger.info("=" * 80)
+    logger.info("LIVEKIT INTELLIGENT INTERRUPTION HANDLER - TEST SUITE")
+    logger.info("=" * 80)
+    logger.info(f"Test started at: {datetime.now()}")
+    logger.info(f"Logs will be saved to: {log_file}")
+    logger.info("")
+    
     show_configuration()
     success = run_test_suite()
+    
+    logger.info("")
+    logger.info("=" * 80)
+    if success:
+        logger.info("[SUCCESS] All tests passed - Logs saved successfully")
+    else:
+        logger.error("[FAILURE] Some tests failed - Check log file for details")
+    logger.info("=" * 80)
+    logger.info(f"Test completed at: {datetime.now()}")
+    
     exit(0 if success else 1)
